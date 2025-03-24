@@ -75,6 +75,6 @@ jobs:
             ${{ env.ALIYUN_DOCKER_REGISTRY }}/aigitlab/${{ env[matrix.image_name_env] }}:${{ env.TAG_VERSION }}
 
       - name: ${{ env.ALIYUN_DOCKER_REGISTRY }}/aigitlab/${{ env[matrix.image_name_env] }}:${{ env.TAG_VERSION }}
-        id: meta
-        uses: ""
+        run: |
+          echo ""
 
