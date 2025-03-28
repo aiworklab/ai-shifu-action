@@ -1,0 +1,79 @@
+name: Build and Push on PR Trigger
+
+on:
+  pull_request:
+    branches:        # 仅当 PR 目标分支是以下分支时触发
+      - "main"
+      - "deploy/dev"
+    types: [opened, reopened, synchronize]  # 默认监听三种代码变更事件
+
+concurrency:
+  group: build-push-${{ github.head_ref || github.run_id }}
+  cancel-in-progress: true
+
+env:
+  ALIYUN_DOCKER_REGISTRY: ${{ vars.ALIYUN_DOCKER_REGISTRY || 'registry.cn-beijing.aliyuncs.com' }}
+  ALIYUN_DOCKER_USERNAME: ${{ secrets.ALIYUN_USER  }}
+  ALIYUN_DOCKER_PASSWORD: ${{ secrets.ALIYUN_TOKEN  }}
+  AI_SHIFU_WEB_IMAGE_NAME: ${{ vars.AI_SHIFU_WEB_IMAGE_NAME || 'ai-shifu-web' }}
+  AI_SHIFU_API_IMAGE_NAME: ${{ vars.AI_SHIFU_API_IMAGE_NAME || 'ai-shifu-api' }}
+  AI_SHIFU_COOK_IMAGE_NAME: ${{ vars.AI_SHIFU_COOK_IMAGE_NAME || 'ai-shifu-cook' }}
+jobs:
+  build:
+    runs-on: ${{ 'ubuntu-latest' }}
+    if: github.repository == 'aiworklab/ai-shifu-action'
+    strategy:
+      matrix:
+        include:
+          - service_name: "build-api"
+            image_name_env: "AI_SHIFU_API_IMAGE_NAME"
+            context: "src/api"
+          - service_name: "build-web"
+            image_name_env: "AI_SHIFU_WEB_IMAGE_NAME"
+            context: "src/web"
+          - service_name: "build-cook"
+            image_name_env: "AI_SHIFU_COOK_IMAGE_NAME"
+            context: "src/cook"
+
+    steps:
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Set Tag Version
+        run: |
+          echo "TAG_VERSION=$(date '+%Y%m%d%H%M%S')" >> $GITHUB_ENV
+
+
+
+      - name: Login to Aliyun Docker Registry
+        uses: docker/login-action@v2
+        with:
+          username: ${{ env.ALIYUN_DOCKER_USERNAME }}
+          password: ${{ env.ALIYUN_DOCKER_PASSWORD }}
+          registry: ${{ env.ALIYUN_DOCKER_REGISTRY }}
+
+      - name: Extract metadata for Docker
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env[matrix.image_name_env] }}
+
+      - name: Build Docker image
+        id: build
+        uses: docker/build-push-action@v6
+        with:
+          context: "{{defaultContext}}:${{ matrix.context }}"
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: |
+            ${{ env.ALIYUN_DOCKER_REGISTRY }}/aigitlab/${{ env[matrix.image_name_env] }}:latest
+            ${{ env.ALIYUN_DOCKER_REGISTRY }}/aigitlab/${{ env[matrix.image_name_env] }}:${{ env.TAG_VERSION }}
+
+      - name: ${{ env.ALIYUN_DOCKER_REGISTRY }}/aigitlab/${{ env[matrix.image_name_env] }}:${{ env.TAG_VERSION }}
+        run: |
+          echo ""
+
