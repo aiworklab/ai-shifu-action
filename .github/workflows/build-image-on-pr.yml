@@ -76,5 +76,3 @@ jobs:
       - name: ${{ env.ALIYUN_DOCKER_REGISTRY }}/aigitlab/${{ env[matrix.image_name_env] }}:${{ env.TAG_VERSION }}
         run: |
           echo ""
-
-
