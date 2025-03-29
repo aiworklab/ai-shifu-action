@@ -13,14 +13,15 @@ concurrency:
 
 env:
   ALIYUN_DOCKER_REGISTRY: ${{ vars.ALIYUN_DOCKER_REGISTRY || 'registry.cn-beijing.aliyuncs.com' }}
-  ALIYUN_DOCKER_USERNAME: ${{ secrets.ALIYUN_USER  }}
-  ALIYUN_DOCKER_PASSWORD: ${{ secrets.ALIYUN_TOKEN  }}
+  ALIYUN_DOCKER_USERNAME: ${{ secrets.ALIYUN_USER }}
+  ALIYUN_DOCKER_PASSWORD: ${{ secrets.ALIYUN_TOKEN }}
   AI_SHIFU_WEB_IMAGE_NAME: ${{ vars.AI_SHIFU_WEB_IMAGE_NAME || 'ai-shifu-web' }}
   AI_SHIFU_API_IMAGE_NAME: ${{ vars.AI_SHIFU_API_IMAGE_NAME || 'ai-shifu-api' }}
   AI_SHIFU_COOK_IMAGE_NAME: ${{ vars.AI_SHIFU_COOK_IMAGE_NAME || 'ai-shifu-cook' }}
+
 jobs:
   build:
-    runs-on: ${{ 'ubuntu-latest' }}
+    runs-on: ubuntu-latest
     if: github.repository == 'aiworklab/ai-shifu-action'
     strategy:
       matrix:
@@ -36,6 +37,27 @@ jobs:
             context: "src/cook"
 
     steps:
+      - name: Validate PR Author Organization Membership
+        id: validate-org
+        run: |
+          ORG_NAME="aiworklab" # 替换为你的组织名称
+          PR_AUTHOR="${{ github.event.pull_request.user.login }}"
+          RESPONSE=$(curl -s -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
+            -H "Accept: application/vnd.github.v3+json" \
+            https://api.github.com/orgs/$ORG_NAME/members/$PR_AUTHOR)
+          if echo "$RESPONSE" | grep -q '"Not Found"'; then
+            echo "User $PR_AUTHOR is not a member of the organization $ORG_NAME. Exiting..."
+            exit 1
+          else
+            echo "User $PR_AUTHOR is a member of the organization $ORG_NAME. Proceeding..."
+          fi
+
+      # 检出 PR 分支的代码
+      - name: Checkout PR branch
+        uses: actions/checkout@v3
+        with:
+          ref: ${{ github.event.pull_request.head.ref }}
+          repository: ${{ github.event.pull_request.head.repo.full_name }}
 
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
@@ -46,8 +68,6 @@ jobs:
       - name: Set Tag Version
         run: |
           echo "TAG_VERSION=$(date '+%Y%m%d%H%M%S')" >> $GITHUB_ENV
-
-
 
       - name: Login to Aliyun Docker Registry
         uses: docker/login-action@v2
