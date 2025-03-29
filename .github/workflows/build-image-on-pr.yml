@@ -1,7 +1,7 @@
 name: Build and Push on PR Trigger
 
 on:
-  pull_request:
+  pull_request_target:
     branches:        # 仅当 PR 目标分支是以下分支时触发
       - "main"
       - "deploy/dev"
