@@ -98,3 +98,7 @@ else:
     from flaskr.command import enable_commands
 
     enable_commands(app)
+
+
+
+
